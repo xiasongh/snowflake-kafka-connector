@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.BinaryNode;
 import com.fasterxml.jackson.databind.node.DoubleNode;
 import com.fasterxml.jackson.databind.node.FloatNode;
 import com.fasterxml.jackson.databind.node.NumericNode;
@@ -14,6 +15,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.codec.binary.Hex;
 
 abstract class StreamingRecordMapper {
 
@@ -74,6 +76,8 @@ abstract class StreamingRecordMapper {
       } else {
         return "NaN";
       }
+    } else if (columnNode instanceof BinaryNode) {
+      return Hex.encodeHexString(((BinaryNode) columnNode).binaryValue());
     } else {
       return mapper.writeValueAsString(columnNode);
     }

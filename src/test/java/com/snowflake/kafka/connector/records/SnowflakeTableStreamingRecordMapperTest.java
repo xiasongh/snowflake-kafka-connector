@@ -6,10 +6,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import org.apache.commons.codec.binary.Hex;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -162,5 +167,28 @@ public class SnowflakeTableStreamingRecordMapperTest extends StreamingRecordMapp
         Arguments.of(
             buildRowWithDefaultMetadata("{\"key\": []}"),
             Map.of(TABLE_COLUMN_METADATA, FULL_SSV2_METADATA, "\"KEY\"", List.of())));
+  }
+
+  @Test
+  public void shouldConvertBinaryDataToHexForSchematization() throws JsonProcessingException {
+    // given
+    SnowflakeTableStreamingRecordMapper mapper =
+        new SnowflakeTableStreamingRecordMapper(objectMapper, true, true);
+
+    String data = "foo";
+    byte[] binaryData = data.getBytes(StandardCharsets.UTF_8);
+    String hexData = Hex.encodeHexString(binaryData);
+
+    ObjectNode contentNode = JsonNodeFactory.instance.objectNode();
+    contentNode.set("binary_column", JsonNodeFactory.instance.binaryNode(binaryData));
+    RecordService.SnowflakeTableRow row =
+        new RecordService.SnowflakeTableRow(
+            new SnowflakeRecordContent(contentNode), objectMapper.readTree("{}"));
+
+    // when
+    Map<String, Object> result = mapper.processSnowflakeRecord(row, false);
+
+    // then
+    assertThat(result).containsEntry("\"BINARY_COLUMN\"", hexData);
   }
 }
