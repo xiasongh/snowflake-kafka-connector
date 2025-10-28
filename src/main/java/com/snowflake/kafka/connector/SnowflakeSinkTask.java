@@ -19,6 +19,7 @@ package com.snowflake.kafka.connector;
 import static com.snowflake.kafka.connector.internal.streaming.channel.TopicPartitionChannel.NO_OFFSET_TOKEN_REGISTERED_IN_SNOWFLAKE;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.snowflake.kafka.connector.config.TopicToTableConfig;
 import com.snowflake.kafka.connector.dlq.KafkaRecordErrorReporter;
 import com.snowflake.kafka.connector.internal.KCLogger;
 import com.snowflake.kafka.connector.internal.SnowflakeConnectionService;
@@ -75,7 +76,7 @@ public class SnowflakeSinkTask extends SinkTask {
   private final int rebalancingSleepTime = 370000;
 
   private SnowflakeSinkService sink = null;
-  private Map<String, String> topic2table = null;
+  private TopicToTableConfig topicToTableConfig = null;
 
   // snowflake JDBC connection provides methods to interact with user's
   // snowflake
@@ -115,9 +116,9 @@ public class SnowflakeSinkTask extends SinkTask {
   public SnowflakeSinkTask(
       SnowflakeSinkService service,
       SnowflakeConnectionService connectionService,
-      Map<String, String> topic2table) {
+      Map<String, String> parsedConfig) {
     this(service, connectionService);
-    this.topic2table = topic2table;
+    this.topicToTableConfig = TopicToTableConfig.fromConfig(parsedConfig);
   }
 
   private SnowflakeConnectionService getConnection() {
@@ -161,8 +162,8 @@ public class SnowflakeSinkTask extends SinkTask {
     this.taskStartTime = System.currentTimeMillis();
     this.taskConfigId = parsedConfig.getOrDefault(Utils.TASK_ID, "-1");
 
-    // generate topic to table map
-    this.topic2table = getTopicToTableMap(parsedConfig);
+    // create topic to table config
+    this.topicToTableConfig = TopicToTableConfig.fromConfig(parsedConfig);
 
     this.authorizationExceptionTracker.updateStateOnTaskStart(parsedConfig);
 
@@ -230,7 +231,7 @@ public class SnowflakeSinkTask extends SinkTask {
               .setFileSize(bufferSizeBytes)
               .setRecordNumber(bufferCountRecords)
               .setFlushTime(bufferFlushTime)
-              .setTopic2TableMap(topic2table)
+              .setTopicToTableConfig(this.topicToTableConfig)
               .setMetadataConfig(metadataConfig)
               .setBehaviorOnNullValuesConfig(behavior)
               .setCustomJMXMetrics(enableCustomJMXMonitoring)
@@ -250,7 +251,7 @@ public class SnowflakeSinkTask extends SinkTask {
               kafkaRecordErrorReporter,
               this.context,
               enableCustomJMXMonitoring,
-              topic2table,
+              this.topicToTableConfig,
               behavior,
               schemaEvolutionService);
     }
@@ -287,7 +288,7 @@ public class SnowflakeSinkTask extends SinkTask {
   @Override
   public void open(final Collection<TopicPartition> partitions) {
     long startTime = System.currentTimeMillis();
-    this.sink.startPartitions(partitions, this.topic2table);
+    this.sink.startPartitions(partitions, this.topicToTableConfig);
     this.DYNAMIC_LOGGER.info(
         "task opened with {} partitions, execution time: {} milliseconds",
         partitions.size(),

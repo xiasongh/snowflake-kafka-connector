@@ -1,7 +1,6 @@
 package com.snowflake.kafka.connector.config;
 
 import com.snowflake.kafka.connector.Utils;
-import java.util.Map;
 
 public class TopicToTableModeExtractor {
 
@@ -25,9 +24,13 @@ public class TopicToTableModeExtractor {
    * @return
    */
   public static Topic2TableMode determineTopic2TableMode(
-      Map<String, String> topic2TableMap, String topic) {
-    String tableName = Utils.tableName(topic, topic2TableMap);
-    return topic2TableMap.values().stream()
+      TopicToTableConfig topicToTableConfig, String topic) {
+    if (topicToTableConfig.useRegex()) {
+      // assume many to one when using regex
+      return Topic2TableMode.MANY_TOPICS_SINGLE_TABLE;
+    }
+    String tableName = Utils.tableName(topic, topicToTableConfig);
+    return topicToTableConfig.getTopicToTableMap().values().stream()
                 .filter(table -> table.equalsIgnoreCase(tableName))
                 .count()
             > 1

@@ -743,7 +743,6 @@ public class SnowflakeConnectionServiceV1 implements SnowflakeConnectionService 
   public void schemaExists(String schemaName) {
     checkConnection();
     String query = "use schema identifier(?)";
-    boolean foundSchema = false;
     try {
       PreparedStatement stmt = conn.prepareStatement(query);
       stmt.setString(1, schemaName);

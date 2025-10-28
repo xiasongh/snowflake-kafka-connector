@@ -8,6 +8,7 @@ import static com.snowflake.kafka.connector.internal.streaming.channel.TopicPart
 import com.codahale.metrics.Gauge;
 import com.snowflake.kafka.connector.SnowflakeSinkConnectorConfig;
 import com.snowflake.kafka.connector.Utils;
+import com.snowflake.kafka.connector.config.TopicToTableConfig;
 import com.snowflake.kafka.connector.dlq.InMemoryKafkaRecordErrorReporter;
 import com.snowflake.kafka.connector.internal.SnowflakeConnectionService;
 import com.snowflake.kafka.connector.internal.SnowflakeConnectionServiceFactory;
@@ -387,7 +388,7 @@ public class SnowflakeSinkServiceV2IT extends SnowflakeSinkServiceV2BaseIT {
     }
     Map<String, String> topic2Table = new HashMap<>();
     topic2Table.put(topic, table);
-    service.startPartitions(topicPartitions, topic2Table);
+    service.startPartitions(topicPartitions, new TopicToTableConfig(topic2Table));
 
     List<SinkRecord> records = new ArrayList<>();
     for (int partition = 0; partition < partitionCount; partition++) {

@@ -6,6 +6,7 @@ import static com.snowflake.kafka.connector.SnowflakeSinkConnectorConfig.INGESTI
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.snowflake.kafka.connector.config.TopicToTableConfig;
 import com.snowflake.kafka.connector.internal.KCLogger;
 import com.snowflake.kafka.connector.internal.SnowflakeConnectionService;
 import com.snowflake.kafka.connector.internal.SnowflakeErrors;
@@ -325,7 +326,7 @@ public class SnowflakeSinkTaskForStreamingIT {
 
     // verify expected num tasks opened
     Mockito.verify(serviceSpy, Mockito.times(1))
-        .startPartitions(Mockito.anyCollection(), Mockito.anyMap());
+        .startPartitions(Mockito.anyCollection(), Mockito.any(TopicToTableConfig.class));
 
     for (String topicStr : expectedTopic2TableConfig.keySet()) {
       TopicPartition topic = null;

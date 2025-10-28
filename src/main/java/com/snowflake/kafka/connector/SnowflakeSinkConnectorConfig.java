@@ -37,6 +37,10 @@ public class SnowflakeSinkConnectorConfig {
 
   // Connector config
   public static final String TOPICS_TABLES_MAP = "snowflake.topic2table.map";
+  public static final String TOPICS_TABLES_REGEX = "snowflake.topic2table.regex";
+  public static final String TOPICS_TABLES_REPLACEMENT = "snowflake.topic2table.replacement";
+  public static final String TOPICS_TABLES_HASH = "snowflake.topic2table.hash";
+  public static final boolean TOPICS_TABLES_HASH_DEFAULT = true;
 
   // For tombstone records
   public static final String BEHAVIOR_ON_NULL_VALUES_CONFIG = "behavior.on.null.values";

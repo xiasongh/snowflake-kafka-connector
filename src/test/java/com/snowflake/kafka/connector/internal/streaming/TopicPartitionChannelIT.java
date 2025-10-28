@@ -6,6 +6,7 @@ import static com.snowflake.kafka.connector.internal.streaming.channel.TopicPart
 
 import com.snowflake.kafka.connector.SnowflakeSinkConnectorConfig;
 import com.snowflake.kafka.connector.Utils;
+import com.snowflake.kafka.connector.config.TopicToTableConfig;
 import com.snowflake.kafka.connector.dlq.InMemoryKafkaRecordErrorReporter;
 import com.snowflake.kafka.connector.internal.SnowflakeConnectionService;
 import com.snowflake.kafka.connector.internal.TestUtils;
@@ -628,7 +629,8 @@ public class TopicPartitionChannelIT {
 
     Map<String, String> topic2Table = new HashMap<>();
     topic2Table.put(topic, testTableName);
-    service.startPartitions(Collections.singletonList(topicPartition), topic2Table);
+    service.startPartitions(
+        Collections.singletonList(topicPartition), new TopicToTableConfig(topic2Table));
 
     // this instance has changed since we removed it from cache and loaded it again.
     TopicPartitionChannel topicPartitionChannelAfterCloseAndStartPartition =

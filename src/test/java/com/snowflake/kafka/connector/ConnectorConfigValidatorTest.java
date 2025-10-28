@@ -18,6 +18,7 @@ import static org.junit.Assert.assertEquals;
 
 import com.snowflake.kafka.connector.config.IcebergConfigValidator;
 import com.snowflake.kafka.connector.config.SnowflakeSinkConnectorConfigBuilder;
+import com.snowflake.kafka.connector.config.TopicToTableConfig;
 import com.snowflake.kafka.connector.config.TopicToTableModeExtractor;
 import com.snowflake.kafka.connector.internal.SnowflakeErrors;
 import com.snowflake.kafka.connector.internal.SnowflakeKafkaConnectorException;
@@ -245,12 +246,81 @@ public class ConnectorConfigValidatorTest {
     config.put(TOPICS_TABLES_MAP, "src1:target1,src2:target2,src3:target1");
     connectorConfigValidator.validateConfig(config);
     Map<String, String> topic2Table = Utils.parseTopicToTableMap(config.get(TOPICS_TABLES_MAP));
-    assertThat(TopicToTableModeExtractor.determineTopic2TableMode(topic2Table, "src1"))
+    assertThat(
+            TopicToTableModeExtractor.determineTopic2TableMode(
+                new TopicToTableConfig(topic2Table), "src1"))
         .isEqualTo(TopicToTableModeExtractor.Topic2TableMode.MANY_TOPICS_SINGLE_TABLE);
-    assertThat(TopicToTableModeExtractor.determineTopic2TableMode(topic2Table, "src2"))
+    assertThat(
+            TopicToTableModeExtractor.determineTopic2TableMode(
+                new TopicToTableConfig(topic2Table), "src2"))
         .isEqualTo(TopicToTableModeExtractor.Topic2TableMode.SINGLE_TOPIC_SINGLE_TABLE);
-    assertThat(TopicToTableModeExtractor.determineTopic2TableMode(topic2Table, "src3"))
+    assertThat(
+            TopicToTableModeExtractor.determineTopic2TableMode(
+                new TopicToTableConfig(topic2Table), "src3"))
         .isEqualTo(TopicToTableModeExtractor.Topic2TableMode.MANY_TOPICS_SINGLE_TABLE);
+  }
+
+  @Test
+  public void testValidRegexAndReplacement() {
+    Map<String, String> config = getConfig();
+    config.put(TOPICS_TABLES_REGEX, "(.*)_topic");
+    config.put(TOPICS_TABLES_REPLACEMENT, "table_$1");
+    connectorConfigValidator.validateConfig(config);
+  }
+
+  @Test
+  public void testRegexWithoutReplacement() {
+    Map<String, String> config = getConfig();
+    config.put(TOPICS_TABLES_REGEX, "(.*)_topic");
+    assertThatThrownBy(() -> connectorConfigValidator.validateConfig(config))
+        .isInstanceOf(SnowflakeKafkaConnectorException.class)
+        .hasMessageContaining(
+            String.format(
+                "Must set both %s and %s", TOPICS_TABLES_REGEX, TOPICS_TABLES_REPLACEMENT));
+  }
+
+  @Test
+  public void testReplacementWithoutRegex() {
+    Map<String, String> config = getConfig();
+    config.put(TOPICS_TABLES_REPLACEMENT, "table_$1");
+    assertThatThrownBy(() -> connectorConfigValidator.validateConfig(config))
+        .isInstanceOf(SnowflakeKafkaConnectorException.class)
+        .hasMessageContaining(
+            String.format(
+                "Must set both %s and %s", TOPICS_TABLES_REGEX, TOPICS_TABLES_REPLACEMENT));
+  }
+
+  @Test
+  public void testMapAndRegex() {
+    Map<String, String> config = getConfig();
+    config.put(TOPICS_TABLES_MAP, "topic1:table1");
+    config.put(TOPICS_TABLES_REGEX, "(.*)_topic");
+    config.put(TOPICS_TABLES_REPLACEMENT, "table_$1");
+    assertThatThrownBy(() -> connectorConfigValidator.validateConfig(config))
+        .isInstanceOf(SnowflakeKafkaConnectorException.class)
+        .hasMessageContaining(
+            String.format("Cannot set both %s and %s", TOPICS_TABLES_MAP, TOPICS_TABLES_REGEX));
+  }
+
+  @Test
+  public void testEmptyRegex() {
+    Map<String, String> config = getConfig();
+    config.put(TOPICS_TABLES_REGEX, "");
+    config.put(TOPICS_TABLES_REPLACEMENT, "table");
+    assertThatThrownBy(() -> connectorConfigValidator.validateConfig(config))
+        .isInstanceOf(SnowflakeKafkaConnectorException.class)
+        .hasMessageContaining(String.format("%s cannot be empty string", TOPICS_TABLES_REGEX));
+  }
+
+  @Test
+  public void testEmptyReplacement() {
+    Map<String, String> config = getConfig();
+    config.put(TOPICS_TABLES_REGEX, "(.*)_topic");
+    config.put(TOPICS_TABLES_REPLACEMENT, "");
+    assertThatThrownBy(() -> connectorConfigValidator.validateConfig(config))
+        .isInstanceOf(SnowflakeKafkaConnectorException.class)
+        .hasMessageContaining(
+            String.format("%s cannot be empty string", TOPICS_TABLES_REPLACEMENT));
   }
 
   @Test

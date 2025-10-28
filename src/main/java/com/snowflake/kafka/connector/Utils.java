@@ -21,6 +21,7 @@ import static com.snowflake.kafka.connector.SnowflakeSinkConnectorConfig.INGESTI
 import static com.snowflake.kafka.connector.SnowflakeSinkConnectorConfig.SNOWPIPE_STREAMING_V2_ENABLED_DEFAULT_VALUE;
 
 import com.google.common.collect.ImmutableMap;
+import com.snowflake.kafka.connector.config.TopicToTableConfig;
 import com.snowflake.kafka.connector.internal.InternalUtils;
 import com.snowflake.kafka.connector.internal.KCLogger;
 import com.snowflake.kafka.connector.internal.OAuthConstants;
@@ -96,6 +97,7 @@ public class Utils {
 
   // constants strings
   private static final String KAFKA_OBJECT_PREFIX = "SNOWFLAKE_KAFKA_CONNECTOR";
+  private static final String PLACEHOLDER = "_";
 
   // task id
   public static final String TASK_ID = "task_id";
@@ -496,7 +498,7 @@ public class Utils {
   public static void convertAppName(Map<String, String> config) {
     String appName = config.getOrDefault(SnowflakeSinkConnectorConfig.NAME, "");
     // If appName is empty the following call will throw error
-    String validAppName = generateValidName(appName, new HashMap<>());
+    String validAppName = generateValidName(appName, new TopicToTableConfig());
 
     config.put(SnowflakeSinkConnectorConfig.NAME, validAppName);
   }
@@ -508,8 +510,8 @@ public class Utils {
    * @param topic2table topic to table map
    * @return valid table name
    */
-  public static String tableName(String topic, Map<String, String> topic2table) {
-    return generateValidName(topic, topic2table);
+  public static String tableName(String topic, TopicToTableConfig config) {
+    return generateValidName(topic, config);
   }
 
   /**
@@ -522,8 +524,15 @@ public class Utils {
    * @return return GeneratedName with valid table name and a flag whether the name was taken from
    *     the topic2table
    */
-  public static GeneratedName generateTableName(String topic, Map<String, String> topic2table) {
-    return generateValidNameFromMap(topic, topic2table);
+  public static GeneratedName generateTableName(String topic, TopicToTableConfig config) {
+    if (config.useRegex()) {
+      return generateValidNameFromRegex(
+          topic,
+          config.getTopicToTableRegex(),
+          config.getTopicToTableReplacement(),
+          config.useHash());
+    }
+    return generateValidNameFromMap(topic, config.getTopicToTableMap(), config.useHash());
   }
 
   /**
@@ -533,8 +542,37 @@ public class Utils {
    * @param topic2table topic to table map
    * @return valid table/application name
    */
-  public static String generateValidName(String topic, Map<String, String> topic2table) {
-    return generateValidNameFromMap(topic, topic2table).name;
+  public static String generateValidName(String topic, TopicToTableConfig config) {
+    return generateTableName(topic, config).name;
+  }
+
+  /**
+   * verify topic name, and generate valid table/application name
+   *
+   * @param topic input topic name
+   * @param regex regex pattern for topic
+   * @param replacement regex replacement for matches
+   * @return valid generated table/application name
+   */
+  private static GeneratedName generateValidNameFromRegex(
+      String topic, Pattern regex, String replacement, boolean useHash) {
+    if (topic == null || topic.isEmpty()) {
+      throw SnowflakeErrors.ERROR_0020.getException("topic name: " + topic);
+    }
+    final String INVALID_REGEX = "^[^_a-zA-Z]|(?!^)[^_$a-zA-Z0-9]";
+    // try matching regex
+    if (regex.matcher(topic).matches()) {
+      String result =
+          regex.matcher(topic).replaceAll(replacement).replaceAll(INVALID_REGEX, PLACEHOLDER);
+      return GeneratedName.fromMap(result);
+    }
+    String result = topic.replaceAll(INVALID_REGEX, PLACEHOLDER);
+    // if invalid characters were replaced, there can be duplicates
+    if (useHash && !result.equals(topic)) {
+      int hash = Math.abs(topic.hashCode());
+      result = result + "_" + hash;
+    }
+    return GeneratedName.generated(result);
   }
 
   /**
@@ -545,8 +583,7 @@ public class Utils {
    * @return valid generated table/application name
    */
   private static GeneratedName generateValidNameFromMap(
-      String topic, Map<String, String> topic2table) {
-    final String PLACE_HOLDER = "_";
+      String topic, Map<String, String> topic2table, boolean useHash) {
     if (topic == null || topic.isEmpty()) {
       throw SnowflakeErrors.ERROR_0020.getException("topic name: " + topic);
     }
@@ -577,19 +614,21 @@ public class Utils {
       result.append(topic.charAt(0));
       index++;
     } else {
-      result.append(PLACE_HOLDER);
+      result.append(PLACEHOLDER);
     }
     while (index < topic.length()) {
       if (topic.substring(index, index + 1).matches("[_$a-zA-Z0-9]")) {
         result.append(topic.charAt(index));
       } else {
-        result.append(PLACE_HOLDER);
+        result.append(PLACEHOLDER);
       }
       index++;
     }
 
-    result.append(PLACE_HOLDER);
-    result.append(hash);
+    if (useHash) {
+      result.append(PLACEHOLDER);
+      result.append(hash);
+    }
 
     return GeneratedName.generated(result.toString());
   }

@@ -12,6 +12,8 @@ import com.snowflake.kafka.connector.internal.streaming.IngestionMethodConfig;
 import com.snowflake.kafka.connector.internal.streaming.StreamingConfigValidator;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import org.apache.kafka.common.config.ConfigException;
 
 public class DefaultConnectorConfigValidator implements ConnectorConfigValidator {
@@ -134,6 +136,59 @@ public class DefaultConnectorConfigValidator implements ConnectorConfigValidator
               "Invalid {} config format: {}",
               SnowflakeSinkConnectorConfig.TOPICS_TABLES_MAP,
               config.get(SnowflakeSinkConnectorConfig.TOPICS_TABLES_MAP)));
+    }
+
+    if (config.containsKey(SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX)) {
+      final String regex = config.get(SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX);
+      if (regex.isEmpty()) {
+        invalidConfigParams.put(
+            SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX,
+            Utils.formatString(
+                "{} cannot be empty string", SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX));
+      } else if (!config.containsKey(SnowflakeSinkConnectorConfig.TOPICS_TABLES_REPLACEMENT)) {
+        invalidConfigParams.put(
+            SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX,
+            Utils.formatString(
+                "Must set both {} and {}",
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX,
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REPLACEMENT));
+      } else if (config.containsKey(SnowflakeSinkConnectorConfig.TOPICS_TABLES_MAP)) {
+        // map and regex are mutually exclusive
+        invalidConfigParams.put(
+            SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX,
+            Utils.formatString(
+                "Cannot set both {} and {}",
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_MAP,
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX));
+      } else {
+        try {
+          Pattern.compile(regex);
+        } catch (PatternSyntaxException e) {
+          invalidConfigParams.put(
+              SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX,
+              Utils.formatString(
+                  "Invalid {} regex pattern: {}",
+                  SnowflakeSinkConnectorConfig.TOPICS_TABLES_MAP,
+                  regex));
+        }
+      }
+    }
+
+    if (config.containsKey(SnowflakeSinkConnectorConfig.TOPICS_TABLES_REPLACEMENT)) {
+      if (config.get(SnowflakeSinkConnectorConfig.TOPICS_TABLES_REPLACEMENT).isEmpty()) {
+        invalidConfigParams.put(
+            SnowflakeSinkConnectorConfig.TOPICS_TABLES_REPLACEMENT,
+            Utils.formatString(
+                "{} cannot be empty string",
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REPLACEMENT));
+      } else if (!config.containsKey(SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX)) {
+        invalidConfigParams.put(
+            SnowflakeSinkConnectorConfig.TOPICS_TABLES_REPLACEMENT,
+            Utils.formatString(
+                "Must set both {} and {}",
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX,
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REPLACEMENT));
+      }
     }
 
     // sanity check

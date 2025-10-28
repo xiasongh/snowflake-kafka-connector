@@ -1,6 +1,7 @@
 package com.snowflake.kafka.connector.internal.streaming;
 
 import com.snowflake.kafka.connector.SnowflakeSinkConnectorConfig;
+import com.snowflake.kafka.connector.config.TopicToTableConfig;
 import com.snowflake.kafka.connector.dlq.InMemoryKafkaRecordErrorReporter;
 import com.snowflake.kafka.connector.dlq.KafkaRecordErrorReporter;
 import com.snowflake.kafka.connector.internal.SnowflakeConnectionService;
@@ -36,7 +37,7 @@ public class StreamingSinkServiceBuilder {
         errorReporter,
         sinkTaskContext,
         enableCustomJMXMonitoring,
-        topicToTableMap,
+        new TopicToTableConfig(topicToTableMap),
         behaviorOnNullValues,
         schemaEvolutionService == null
             ? new SnowflakeSchemaEvolutionService(conn)

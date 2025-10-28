@@ -14,6 +14,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.snowflake.kafka.connector.SnowflakeSinkConnectorConfig;
 import com.snowflake.kafka.connector.Utils;
+import com.snowflake.kafka.connector.config.TopicToTableConfig;
 import com.snowflake.kafka.connector.config.TopicToTableModeExtractor;
 import com.snowflake.kafka.connector.internal.metrics.MetricsJmxReporter;
 import com.snowflake.kafka.connector.internal.metrics.MetricsUtil;
@@ -82,7 +83,7 @@ class SnowflakeSinkServiceV1 implements SnowflakeSinkService {
   private final RecordService recordService;
   private boolean isStopped;
   private final SnowflakeTelemetryService telemetryService;
-  private Map<String, String> topic2TableMap;
+  private TopicToTableConfig topicToTableConfig;
 
   // Behavior to be set at the start of connector start. (For tombstone records)
   private SnowflakeSinkConnectorConfig.BehaviorOnNullValues behaviorOnNullValues;
@@ -118,7 +119,7 @@ class SnowflakeSinkServiceV1 implements SnowflakeSinkService {
     isStopped = false;
     this.telemetryService = conn.getTelemetryClient();
     this.recordService = RecordServiceFactory.createRecordService(false, false, false);
-    this.topic2TableMap = new HashMap<>();
+    this.topicToTableConfig = new TopicToTableConfig();
     this.v2CleanerIntervalSeconds = v2CleanerIntervalSeconds;
 
     // Setting the default value in constructor
@@ -136,7 +137,7 @@ class SnowflakeSinkServiceV1 implements SnowflakeSinkService {
   @Override
   public void startPartition(final String tableName, final TopicPartition topicPartition) {
     Utils.GeneratedName generatedTableName =
-        Utils.generateTableName(topicPartition.topic(), topic2TableMap);
+        Utils.generateTableName(topicPartition.topic(), topicToTableConfig);
     if (!tableName.equals(generatedTableName.getName())) {
       LOGGER.warn(
           "tableNames do not match, this is acceptable in tests but not in production! Resorting to"
@@ -168,7 +169,7 @@ class SnowflakeSinkServiceV1 implements SnowflakeSinkService {
 
       if (enableStageFilePrefixExtension
           && TopicToTableModeExtractor.determineTopic2TableMode(
-                  topic2TableMap, topicPartition.topic())
+                  topicToTableConfig, topicPartition.topic())
               == TopicToTableModeExtractor.Topic2TableMode.MANY_TOPICS_SINGLE_TABLE) {
         // if snowflake.snowpipe.stageFileNameExtensionEnabled is enabled and table is used by
         // multiple topics, we may end up in a situation, when data from different topics may have
@@ -192,8 +193,9 @@ class SnowflakeSinkServiceV1 implements SnowflakeSinkService {
 
   @Override
   public void startPartitions(
-      Collection<TopicPartition> partitions, Map<String, String> topic2Table) {
-    partitions.forEach(tp -> this.startPartition(Utils.tableName(tp.topic(), topic2Table), tp));
+      Collection<TopicPartition> partitions, TopicToTableConfig topicToTableConfig) {
+    partitions.forEach(
+        tp -> this.startPartition(Utils.tableName(tp.topic(), topicToTableConfig), tp));
   }
 
   @Override
@@ -263,7 +265,7 @@ class SnowflakeSinkServiceV1 implements SnowflakeSinkService {
           record.topic(),
           record.kafkaPartition());
       startPartition(
-          Utils.tableName(record.topic(), this.topic2TableMap),
+          Utils.tableName(record.topic(), this.topicToTableConfig),
           new TopicPartition(record.topic(), record.kafkaPartition()));
     }
     LOGGER.trace("Inserting record for pipe {} with offset {}", nameIndex, record.kafkaOffset());
@@ -388,8 +390,8 @@ class SnowflakeSinkServiceV1 implements SnowflakeSinkService {
     }
   }
 
-  public void setTopic2TableMap(Map<String, String> topic2TableMap) {
-    this.topic2TableMap = topic2TableMap;
+  public void setTopicToTableConfig(TopicToTableConfig config) {
+    this.topicToTableConfig = config;
   }
 
   public void setMetadataConfig(SnowflakeMetadataConfig configMap) {

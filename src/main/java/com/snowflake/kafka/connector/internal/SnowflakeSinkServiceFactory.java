@@ -1,9 +1,11 @@
 package com.snowflake.kafka.connector.internal;
 
 import com.snowflake.kafka.connector.SnowflakeSinkConnectorConfig;
+import com.snowflake.kafka.connector.config.TopicToTableConfig;
 import com.snowflake.kafka.connector.dlq.KafkaRecordErrorReporter;
 import com.snowflake.kafka.connector.records.SnowflakeMetadataConfig;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.sink.SinkTaskContext;
 
@@ -144,13 +146,21 @@ public class SnowflakeSinkServiceFactory {
       return this;
     }
 
-    public SnowflakeSinkServiceBuilder setTopic2TableMap(Map<String, String> topic2TableMap) {
-      this.service.setTopic2TableMap(topic2TableMap);
+    public SnowflakeSinkServiceBuilder setTopicToTableConfig(TopicToTableConfig config) {
+      this.service.setTopicToTableConfig(config);
+
       StringBuilder map = new StringBuilder();
-      for (Map.Entry<String, String> entry : topic2TableMap.entrySet()) {
+      for (Map.Entry<String, String> entry : config.getTopicToTableMap().entrySet()) {
         map.append(entry.getKey()).append(" -> ").append(entry.getValue()).append("\n");
       }
       LOGGER.info("set topic 2 table map \n {}", map.toString());
+
+      Pattern pattern = config.getTopicToTableRegex();
+      LOGGER.info("set topic 2 table regex to {}", pattern != null ? pattern.pattern() : "null");
+
+      String replacement = config.getTopicToTableReplacement();
+      LOGGER.info("set topic 2 table replacement to {}", replacement);
+
       return this;
     }
 

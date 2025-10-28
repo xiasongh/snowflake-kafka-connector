@@ -15,6 +15,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.snowflake.kafka.connector.SnowflakeSinkConnectorConfig;
 import com.snowflake.kafka.connector.Utils;
+import com.snowflake.kafka.connector.config.TopicToTableConfig;
 import com.snowflake.kafka.connector.dlq.KafkaRecordErrorReporter;
 import com.snowflake.kafka.connector.internal.KCLogger;
 import com.snowflake.kafka.connector.internal.SnowflakeConnectionService;
@@ -81,7 +82,7 @@ public class SnowflakeSinkServiceV2 implements SnowflakeSinkService {
 
   private final SchemaEvolutionService schemaEvolutionService;
 
-  private final Map<String, String> topicToTableMap;
+  private final TopicToTableConfig topicToTableConfig;
 
   // Behavior to be set at the start of connector start. (For tombstone records)
   private final SnowflakeSinkConnectorConfig.BehaviorOnNullValues behaviorOnNullValues;
@@ -128,7 +129,7 @@ public class SnowflakeSinkServiceV2 implements SnowflakeSinkService {
       KafkaRecordErrorReporter recordErrorReporter,
       SinkTaskContext sinkTaskContext,
       boolean enableCustomJMXMonitoring,
-      Map<String, String> topicToTableMap,
+      TopicToTableConfig topicToTableConfig,
       SnowflakeSinkConnectorConfig.BehaviorOnNullValues behaviorOnNullValues,
       SchemaEvolutionService schemaEvolutionService) {
     if (conn == null || conn.isClosed()) {
@@ -140,7 +141,7 @@ public class SnowflakeSinkServiceV2 implements SnowflakeSinkService {
     this.kafkaRecordErrorReporter = recordErrorReporter;
     this.sinkTaskContext = sinkTaskContext;
     this.enableCustomJMXMonitoring = enableCustomJMXMonitoring;
-    this.topicToTableMap = topicToTableMap;
+    this.topicToTableConfig = topicToTableConfig;
     this.schemaEvolutionService = schemaEvolutionService;
 
     this.recordService =
@@ -196,21 +197,22 @@ public class SnowflakeSinkServiceV2 implements SnowflakeSinkService {
    */
   @Override
   public void startPartitions(
-      Collection<TopicPartition> partitions, Map<String, String> topic2Table) {
+      Collection<TopicPartition> partitions, TopicToTableConfig topicToTableConfig) {
     partitions.stream()
         .map(TopicPartition::topic)
         .distinct()
-        .forEach(topic -> perTopicActionsOnStartPartitions(topic, topic2Table));
+        .forEach(topic -> perTopicActionsOnStartPartitions(topic, topicToTableConfig));
     partitions.forEach(
         tp -> {
-          String tableName = Utils.tableName(tp.topic(), topic2Table);
+          String tableName = Utils.tableName(tp.topic(), topicToTableConfig);
           createStreamingChannelForTopicPartition(
               tableName, tp, tableName2SchemaEvolutionPermission.get(tableName));
         });
   }
 
-  private void perTopicActionsOnStartPartitions(String topic, Map<String, String> topic2Table) {
-    String tableName = Utils.tableName(topic, topic2Table);
+  private void perTopicActionsOnStartPartitions(
+      String topic, TopicToTableConfig topicToTableConfig) {
+    String tableName = Utils.tableName(topic, topicToTableConfig);
     tableActionsOnStartPartition(tableName);
   }
 
@@ -378,7 +380,7 @@ public class SnowflakeSinkServiceV2 implements SnowflakeSinkService {
           record.topic(),
           record.kafkaPartition());
       startPartition(
-          Utils.tableName(record.topic(), this.topicToTableMap),
+          Utils.tableName(record.topic(), this.topicToTableConfig),
           new TopicPartition(record.topic(), record.kafkaPartition()));
     }
 

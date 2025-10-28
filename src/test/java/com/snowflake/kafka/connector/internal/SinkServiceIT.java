@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import com.snowflake.kafka.connector.SnowflakeSinkConnectorConfig;
 import com.snowflake.kafka.connector.Utils;
+import com.snowflake.kafka.connector.config.TopicToTableConfig;
 import com.snowflake.kafka.connector.records.SnowflakeConverter;
 import com.snowflake.kafka.connector.records.SnowflakeJsonConverter;
 import io.confluent.connect.avro.AvroConverter;
@@ -59,7 +60,7 @@ public class SinkServiceIT {
     SnowflakeSinkService service =
         SnowflakeSinkServiceFactory.builder(conn)
             .setRecordNumber(1)
-            .setTopic2TableMap(topic2Table)
+            .setTopicToTableConfig(new TopicToTableConfig(topic2Table))
             .addTask(table, new TopicPartition(topic, partition))
             .build();
 
@@ -897,7 +898,7 @@ public class SinkServiceIT {
     SnowflakeSinkService service =
         SnowflakeSinkServiceFactory.builder(spyConn)
             .setRecordNumber(1)
-            .setTopic2TableMap(topic2Table)
+            .setTopicToTableConfig(new TopicToTableConfig(topic2Table))
             .addTask(table, new TopicPartition(topic, partition))
             .build();
 

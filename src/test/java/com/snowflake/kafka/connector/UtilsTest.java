@@ -1,5 +1,6 @@
 package com.snowflake.kafka.connector;
 
+import com.snowflake.kafka.connector.config.TopicToTableConfig;
 import com.snowflake.kafka.connector.internal.SnowflakeErrors;
 import com.snowflake.kafka.connector.internal.SnowflakeURL;
 import com.snowflake.kafka.connector.internal.TestUtils;
@@ -99,17 +100,22 @@ public class UtilsTest {
   public void testTableName() {
     Map<String, String> topic2table = Utils.parseTopicToTableMap("ab@cd:abcd, 1234:_1234");
 
-    assert Utils.tableName("ab@cd", topic2table).equals("abcd");
-    assert Utils.tableName("1234", topic2table).equals("_1234");
+    assert Utils.tableName("ab@cd", new TopicToTableConfig(topic2table)).equals("abcd");
+    assert Utils.tableName("1234", new TopicToTableConfig(topic2table)).equals("_1234");
 
-    TestUtils.assertError(SnowflakeErrors.ERROR_0020, () -> Utils.tableName("", topic2table));
-    TestUtils.assertError(SnowflakeErrors.ERROR_0020, () -> Utils.tableName(null, topic2table));
+    TestUtils.assertError(
+        SnowflakeErrors.ERROR_0020, () -> Utils.tableName("", new TopicToTableConfig(topic2table)));
+    TestUtils.assertError(
+        SnowflakeErrors.ERROR_0020,
+        () -> Utils.tableName(null, new TopicToTableConfig(topic2table)));
 
     String topic = "bc*def";
-    assert Utils.tableName(topic, topic2table).equals("bc_def_" + Math.abs(topic.hashCode()));
+    assert Utils.tableName(topic, new TopicToTableConfig(topic2table))
+        .equals("bc_def_" + Math.abs(topic.hashCode()));
 
     topic = "12345";
-    assert Utils.tableName(topic, topic2table).equals("_12345_" + Math.abs(topic.hashCode()));
+    assert Utils.tableName(topic, new TopicToTableConfig(topic2table))
+        .equals("_12345_" + Math.abs(topic.hashCode()));
   }
 
   @Test
@@ -117,30 +123,36 @@ public class UtilsTest {
     Map<String, String> topic2table = Utils.parseTopicToTableMap("ab@cd:abcd, 1234:_1234");
 
     String topic0 = "ab@cd";
-    Utils.GeneratedName generatedTableName1 = Utils.generateTableName(topic0, topic2table);
+    Utils.GeneratedName generatedTableName1 =
+        Utils.generateTableName(topic0, new TopicToTableConfig(topic2table));
     Assert.assertEquals("abcd", generatedTableName1.getName());
     Assert.assertTrue(generatedTableName1.isNameFromMap());
 
     String topic1 = "1234";
-    Utils.GeneratedName generatedTableName2 = Utils.generateTableName(topic1, topic2table);
+    Utils.GeneratedName generatedTableName2 =
+        Utils.generateTableName(topic1, new TopicToTableConfig(topic2table));
     Assert.assertEquals("_1234", generatedTableName2.getName());
     Assert.assertTrue(generatedTableName2.isNameFromMap());
 
     String topic2 = "bc*def";
-    Utils.GeneratedName generatedTableName3 = Utils.generateTableName(topic2, topic2table);
+    Utils.GeneratedName generatedTableName3 =
+        Utils.generateTableName(topic2, new TopicToTableConfig(topic2table));
     Assert.assertEquals("bc_def_" + Math.abs(topic2.hashCode()), generatedTableName3.getName());
     Assert.assertFalse(generatedTableName3.isNameFromMap());
 
     String topic3 = "12345";
-    Utils.GeneratedName generatedTableName4 = Utils.generateTableName(topic3, topic2table);
+    Utils.GeneratedName generatedTableName4 =
+        Utils.generateTableName(topic3, new TopicToTableConfig(topic2table));
     Assert.assertEquals("_12345_" + Math.abs(topic3.hashCode()), generatedTableName4.getName());
     Assert.assertFalse(generatedTableName4.isNameFromMap());
 
     TestUtils.assertError(
-        SnowflakeErrors.ERROR_0020, () -> Utils.generateTableName("", topic2table));
+        SnowflakeErrors.ERROR_0020,
+        () -> Utils.generateTableName("", new TopicToTableConfig(topic2table)));
     //noinspection DataFlowIssue
     TestUtils.assertError(
-        SnowflakeErrors.ERROR_0020, () -> Utils.generateTableName(null, topic2table));
+        SnowflakeErrors.ERROR_0020,
+        () -> Utils.generateTableName(null, new TopicToTableConfig(topic2table)));
   }
 
   @Test
@@ -155,14 +167,15 @@ public class UtilsTest {
         Utils.parseTopicToTableMap(
             Utils.formatString("{}:{},{}:{}", catTopicRegex, catTable, dogTopicRegex, dogTable));
 
-    assert Utils.tableName("calico_cat", topic2table).equals(catTable);
-    assert Utils.tableName("orange_cat", topic2table).equals(catTable);
-    assert Utils.tableName("_cat", topic2table).equals(catTable);
-    assert Utils.tableName("corgi_dog", topic2table).equals(dogTable);
+    assert Utils.tableName("calico_cat", new TopicToTableConfig(topic2table)).equals(catTable);
+    assert Utils.tableName("orange_cat", new TopicToTableConfig(topic2table)).equals(catTable);
+    assert Utils.tableName("_cat", new TopicToTableConfig(topic2table)).equals(catTable);
+    assert Utils.tableName("corgi_dog", new TopicToTableConfig(topic2table)).equals(dogTable);
 
     // test new topic should not have wildcard
     String topic = "bird.*";
-    assert Utils.tableName(topic, topic2table).equals("bird_" + Math.abs(topic.hashCode()));
+    assert Utils.tableName(topic, new TopicToTableConfig(topic2table))
+        .equals("bird_" + Math.abs(topic.hashCode()));
   }
 
   @Test
@@ -337,5 +350,69 @@ public class UtilsTest {
     Assert.assertEquals("\"abc\"", Utils.quoteNameIfNeeded("\"abc\""));
     Assert.assertEquals("\"ABC\"", Utils.quoteNameIfNeeded("ABC"));
     Assert.assertEquals("\"A\"", Utils.quoteNameIfNeeded("a"));
+  }
+
+  @Test
+  public void testTopicToTableHash() {
+    TopicToTableConfig configWithDefaultHash = TopicToTableConfig.fromConfig(Map.of());
+    Assert.assertTrue(configWithDefaultHash.useHash()); // should default true
+
+    TopicToTableConfig configWithHashDisabled =
+        TopicToTableConfig.fromConfig(
+            Map.of(SnowflakeSinkConnectorConfig.TOPICS_TABLES_HASH, "false"));
+    String topic = "gogo.topic";
+    Utils.GeneratedName result = Utils.generateTableName(topic, configWithHashDisabled);
+    Assert.assertFalse(configWithHashDisabled.useHash());
+    Assert.assertEquals("gogo_topic", result.getName());
+  }
+
+  @Test
+  public void testTopicToTableRegex() {
+    // no regex
+    TopicToTableConfig emptyConfig =
+        TopicToTableConfig.fromConfig(
+            Map.of(SnowflakeSinkConnectorConfig.TOPICS_TABLES_MAP, "gogo_topic:gogo_table"));
+    Assert.assertFalse(emptyConfig.useRegex());
+
+    // happy case
+    String topic = "prefix.gogo.suffix";
+    TopicToTableConfig regexConfig =
+        TopicToTableConfig.fromConfig(
+            Map.of(
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX, "prefix\\.(.*)\\.suffix",
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REPLACEMENT, "$1_table"));
+    Utils.GeneratedName result = Utils.generateTableName(topic, regexConfig);
+    Assert.assertTrue(regexConfig.useRegex());
+    Assert.assertEquals("gogo_table", result.getName());
+
+    // invalid characters in replacement
+    regexConfig =
+        TopicToTableConfig.fromConfig(
+            Map.of(
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX, "prefix\\.(.*)\\.suffix",
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REPLACEMENT, "$1.table"));
+    result = Utils.generateTableName(topic, regexConfig);
+    Assert.assertEquals("gogo_table", result.getName());
+
+    // no match
+    topic = "nogo";
+    regexConfig =
+        TopicToTableConfig.fromConfig(
+            Map.of(
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX, "prefix\\.(.*)\\.suffix",
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REPLACEMENT, "$1.table"));
+    result = Utils.generateTableName(topic, regexConfig);
+    Assert.assertEquals(topic, result.getName());
+
+    // no match with invalid character
+    topic = "nogo.topic";
+    int hash = Math.abs(topic.hashCode());
+    regexConfig =
+        TopicToTableConfig.fromConfig(
+            Map.of(
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REGEX, "prefix\\.(.*)\\.suffix",
+                SnowflakeSinkConnectorConfig.TOPICS_TABLES_REPLACEMENT, "$1.table"));
+    result = Utils.generateTableName(topic, regexConfig);
+    Assert.assertEquals("nogo_topic_" + hash, result.getName());
   }
 }

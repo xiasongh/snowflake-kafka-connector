@@ -18,6 +18,7 @@ public class ConnectorConfigDefinition {
 
   private static final ConfigDef.Validator NON_EMPTY_STRING_VALIDATOR =
       new ConfigDef.NonEmptyString();
+  private static final ConfigDef.Validator REGEX_VALIDATOR = new RegexValidator();
   private static final ConfigDef.Validator TOPIC_TO_TABLE_VALIDATOR = new TopicToTableValidator();
   private static final ConfigDef.Validator KAFKA_PROVIDER_VALIDATOR = new KafkaProviderValidator();
   private static final ConfigDef.Validator STREAMING_CLIENT_PROVIDER_OVERRIDE_MAP_VALIDATOR =
@@ -216,6 +217,38 @@ public class ConnectorConfigDefinition {
             ConfigDef.Width.NONE,
             TOPICS_TABLES_MAP)
         .define(
+            TOPICS_TABLES_REGEX,
+            ConfigDef.Type.STRING,
+            null,
+            ConfigDef.CompositeValidator.of(NON_EMPTY_STRING_VALIDATOR, REGEX_VALIDATOR),
+            ConfigDef.Importance.LOW,
+            "Regex pattern to match topic names for table name transformation",
+            CONNECTOR_CONFIG_DOC,
+            1,
+            ConfigDef.Width.NONE,
+            TOPICS_TABLES_REGEX)
+        .define(
+            TOPICS_TABLES_REPLACEMENT,
+            ConfigDef.Type.STRING,
+            null,
+            NON_EMPTY_STRING_VALIDATOR,
+            ConfigDef.Importance.LOW,
+            "Replacement string for regex pattern",
+            CONNECTOR_CONFIG_DOC,
+            2,
+            ConfigDef.Width.NONE,
+            TOPICS_TABLES_REPLACEMENT)
+        .define(
+            TOPICS_TABLES_HASH,
+            ConfigDef.Type.BOOLEAN,
+            TOPICS_TABLES_HASH_DEFAULT,
+            ConfigDef.Importance.LOW,
+            "Flag to control whether hash will be appended to table name",
+            CONNECTOR_CONFIG_DOC,
+            3,
+            ConfigDef.Width.NONE,
+            TOPICS_TABLES_HASH)
+        .define(
             BUFFER_COUNT_RECORDS,
             ConfigDef.Type.LONG,
             BUFFER_COUNT_RECORDS_DEFAULT,
@@ -224,7 +257,7 @@ public class ConnectorConfigDefinition {
             "Number of records buffered in memory per partition before triggering Snowflake"
                 + " ingestion",
             CONNECTOR_CONFIG_DOC,
-            1,
+            4,
             ConfigDef.Width.NONE,
             BUFFER_COUNT_RECORDS)
         .define(
@@ -236,7 +269,7 @@ public class ConnectorConfigDefinition {
             "Cumulative size of records buffered in memory per partition before triggering"
                 + " Snowflake ingestion",
             CONNECTOR_CONFIG_DOC,
-            2,
+            4,
             ConfigDef.Width.NONE,
             BUFFER_SIZE_BYTES)
         .define(
@@ -247,7 +280,7 @@ public class ConnectorConfigDefinition {
             ConfigDef.Importance.LOW,
             "The time in seconds to flush cached data",
             CONNECTOR_CONFIG_DOC,
-            3,
+            5,
             ConfigDef.Width.NONE,
             BUFFER_FLUSH_TIME_SEC)
         .define(
